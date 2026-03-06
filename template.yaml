@@ -44,7 +44,7 @@ Resources:
   GetAllTasksFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/get-all.handler
+      Handler: src/getAll.handler
       Policies: # Read-only permission
         - DynamoDBReadPolicy:
             TableName: !Ref TasksTable
@@ -59,7 +59,7 @@ Resources:
   GetTaskByIdFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/get-by-id.handler
+      Handler: src/getById.handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TasksTable
