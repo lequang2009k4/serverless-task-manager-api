@@ -41,7 +41,7 @@ Key Configuration Options:
 # 4. API Testing
 Once deployment is complete, the **ApiUrl** will be displayed in the Outputs section. Use the following curl commands to test your endpoints:
 |   API  | Command |
-| ------------- |:-------------:|
+| ------------- |-------------|
 |    POST /tasks  | `curl -X POST ApiUrl -H "Content-Type: application/json" -d '{"title": "You are deploy sucsess "}'`|
 | GET /tasks      | `curl -X GET ApiUrl`    |
 | GET /tasks/{id}    | `curl -X GET ApiUrl/id`    |
