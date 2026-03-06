@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09' # CloudFormation language version (standard value)
+Transform: AWS::Serverless-2016-10-31  # Important: Tells AWS this is SAM, not standard CloudFormation
+Description: Task Management API - Optimized with Globals and Block Style
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    CodeUri: . # Root located (package.json &&src)
+    Timeout: 10
+    Environment:  # Accessible in code via: const TABLE_NAME = process.env.TABLE_NAME
+      Variables:
+        TABLE_NAME: !Ref TasksTable  # All Lambdas can see this variable
+
+Resources:
+  # DynamoDB Table for storing tasks
+  TasksTable:
+    Type: AWS::DynamoDB::Table  # Declares a NoSQL database table
+    Properties:
+      TableName: MySimpleTasks
+      AttributeDefinitions:     # Declares columns used as keys
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:                # Defines 'id' as the HASH (Partition Key) used for data lookups
+        - AttributeName: id
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST  # On-demand scaling (pay only for what you use)
+
+  # POST /tasks
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function # A Lambda entity supported by SAM
+    Properties:
+      Handler: src/create.handler   # Execution entry point: find create.js and call the handler function
+      Policies:
+        - DynamoDBWritePolicy:  # Permissions - Allows Create functions to write data
+            TableName: !Ref TasksTable  # Grant permissions specifically for the TasksTable defined above
+      Events:
+        CreateApi:
+          Type: Api  # Creates an HTTP API endpoint to route requests to this Lambda
+          Properties:
+            Path: /tasks
+            Method: post
+
+  # GET /tasks
+  GetAllTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/get-all.handler
+      Policies: # Read-only permission
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:  # Where SAM automatically creates the API Gateway
+        GetAllApi:
+          Type: Api
+          Properties:
+            Path: /tasks
+            Method: get
+
+  # GET /tasks/{id}
+  GetTaskByIdFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/get-by-id.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        GetByIdApi:
+          Type: Api
+          Properties:
+            Path: /tasks/{id}
+            Method: get
+
+  # DELETE /tasks/{id}
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/delete.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        DeleteApi:
+          Type: Api
+          Properties:
+            Path: /tasks/{id}
+            Method: delete
+
+Outputs:
+  ApiUrl:
+    Description: "Base URL for the API Gateway"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/tasks"
