@@ -1,9 +1,9 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "serverless-task-manager-api"
+stack_name = "task-manager-api-mvc"
 resolve_s3 = true
-s3_prefix = "serverless-task-manager-api"
+s3_prefix = "task-manager-api-mvc"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
