@@ -2,22 +2,44 @@ import { taskService } from "../services/taskService.js";
 import { created, clientError, serverError } from "../utils/response.js";
 import { validator } from "../utils/validator.js";
 
+/**
+ * Lambda/Controller handler to create a new task.
+ * @param {Object} event - The event object from the provider (e.g., AWS API Gateway).
+ * @returns {Object} - Formatted HTTP response.
+ */
 export const handler = async (event) => {
     try {
-        if (!event.body) return clientError("Dữ liệu đầu vào không được để trống.");
-        
-        const data = JSON.parse(event.body);
-        
-        // 1. Validate: Chỉ check tiêu đề không được để trống
-        const check = validator.validateCreateTask(data);
-        if (!check.isValid) return clientError(check.errors[0]);
+        // Check if the request body exists
+        if (!event.body) {
+            return clientError("Input data cannot be empty.");
+        }
 
-        // 2. Gọi Service xử lý
-        const result = await taskService.createNewTask(data);
-        
-        return created(result);
+        // Parse the incoming JSON string into an object
+        let data;
+        try {
+            data = JSON.parse(event.body);
+        } catch (parseError) {
+            return clientError("Invalid JSON format.");
+        }
+
+        // 1. Validation: Ensure required fields (e.g., title) are present
+        const validationResult = validator.validateCreateTask(data);
+        if (!validationResult.isValid) {
+            // Return the first validation error message found
+            return clientError(validationResult.errors);
+        }
+
+        // 2. Business Logic: Call the service layer to interact with the database
+        const newTask = await taskService.createNewTask(data);
+
+        // Return a 201 Created response with the result data
+        return created(newTask);
+
     } catch (error) {
+        // Log the error for internal debugging
         console.error("Error creating task:", error);
-        return serverError(error);
+
+        // Return a 500 Internal Server Error response
+        return serverError("An unexpected error occurred while creating the task.");
     }
 };
