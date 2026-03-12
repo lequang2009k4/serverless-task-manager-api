@@ -3,36 +3,57 @@ import { success, serverError, notFound, clientError } from "../utils/response.j
 
 /**
  * Lambda handler to delete a specific task by its ID.
+ * Integrated with Structured Logging & Request Context.
  * @param {Object} event - Contains request metadata and path parameters.
- * @returns {Object} - Response indicating success or failure.
+ * @param {Object} context - The Lambda context object for runtime information.
  */
-export const handler = async (event) => {
+export const handler = async (event, context) => {
+    // 1. Initialize logContext (Correlation ID for tracing)
+    const logContext = {
+        awsRequestId: context.awsRequestId,
+        path: event.path,
+        httpMethod: event.httpMethod
+    };
+
     try {
         // Extract the unique task ID from the URL path parameters
         const id = event.pathParameters?.id;
 
-        // Validation: Ensure the ID is provided before proceeding
+        // 2. Structured Log (DEBUG): Record the delete attempt
+        console.debug(JSON.stringify({
+            level: "DEBUG",
+            timestamp: new Date().toISOString(),
+            requestId: logContext.awsRequestId,
+            message: "Attempting to delete task",
+            taskId: id
+        }));
+
+        // Validation: Ensure the ID is provided
         if (!id) {
-            return clientError("Task ID is required.");
+            return clientError("Task ID is required.", logContext);
         }
 
-        // Business Logic: Request the service layer to delete the task from the database
+        // 3. Business Logic: Request service layer to delete the task
         await taskService.removeTask(id);
 
-        // Return a 200 OK success response with a confirmation message
-        return success({ message: `Task ${id} has been successfully deleted.` });
+        // Return a 200 OK and automatically log at INFO level via response.js
+        return success({ 
+            message: `Task ${id} has been successfully deleted.` 
+        }, logContext);
 
     } catch (error) {
-        // Error Handling: If the service throws a "Not Found" error, return 404
-        // (Assuming the service uses the keyword "Not found" in its exception)
-        if (error.message.includes("Not found") || error.message.includes("Không tìm thấy")) {
-            return notFound(error.message);
+        /**
+         * 4. Error Handling
+         * If the service layer indicates the item doesn't exist, return 404 (WARN level)
+         */
+        if (error.message.includes("Not found") ) {
+            return notFound(error.message, logContext);
         }
 
-        // Log the full error for server-side debugging
-        console.error("Error deleting task:", error);
-
-        // Return a 500 Internal Server Error for any other unexpected issues
-        return serverError("An error occurred while attempting to delete the task.");
+        /**
+         * 5. Unexpected System Errors
+         * serverError will log the full Stack Trace as FATAL in CloudWatch
+         */
+        return serverError(error, logContext);
     }
 };

@@ -2,56 +2,99 @@ import {
     PutCommand, 
     GetCommand, 
     ScanCommand, 
-    DeleteCommand, 
-    UpdateCommand 
+    DeleteCommand 
 } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLE_NAME } from "../config/dynamoClient.js";
 import { Task } from "../models/taskModel.js";
 
 /**
  * Task Repository
- * Handles direct database operations using DynamoDB DocumentClient.
+ * Handles direct database operations with structured error logging.
  */
 export const taskRepository = {
-    // Save a new task or overwrite an existing one
+    // Save a new task
     async save(task) {
-        const command = new PutCommand({
-            TableName: TABLE_NAME,
-            Item: task,
-        });
-        await docClient.send(command);
-        return task;
+        try {
+            const command = new PutCommand({
+                TableName: TABLE_NAME,
+                Item: task,
+            });
+            await docClient.send(command);
+            return task;
+        } catch (error) {
+            console.error(JSON.stringify({
+                level: "ERROR",
+                timestamp: new Date().toISOString(),
+                component: "TaskRepository",
+                operation: "save",
+                taskId: task.id,
+                message: error.message
+            }));
+            throw error; // Re-throw so Service/Handler can react
+        }
     },
 
-    // Retrieve a single task by its ID
+    // Retrieve a single task by ID
     async getById(id) {
-        const command = new GetCommand({
-            TableName: TABLE_NAME,
-            Key: { id },
-        });
-        const { Item } = await docClient.send(command);
-        
-        // Return a Task Model instance to ensure data consistency
-        return Item ? new Task(Item) : null;
+        try {
+            const command = new GetCommand({
+                TableName: TABLE_NAME,
+                Key: { id },
+            });
+            const { Item } = await docClient.send(command);
+            return Item ? new Task(Item) : null;
+        } catch (error) {
+            console.error(JSON.stringify({
+                level: "ERROR",
+                timestamp: new Date().toISOString(),
+                component: "TaskRepository",
+                operation: "getById",
+                taskId: id,
+                message: error.message
+            }));
+            throw error;
+        }
     },
 
-    // Retrieve all tasks from the table (Scan operation)
+    // Retrieve all tasks (Scan)
     async getAll() {
-        const command = new ScanCommand({
-            TableName: TABLE_NAME,
-        });
-        const { Items } = await docClient.send(command);
-        
-        // Map raw items to Task Model instances
-        return (Items || []).map(item => new Task(item));
+        try {
+            const command = new ScanCommand({
+                TableName: TABLE_NAME,
+            });
+            const { Items } = await docClient.send(command);
+            return (Items || []).map(item => new Task(item));
+        } catch (error) {
+            console.error(JSON.stringify({
+                level: "ERROR",
+                timestamp: new Date().toISOString(),
+                component: "TaskRepository",
+                operation: "getAll",
+                message: error.message
+            }));
+            throw error;
+        }
     },
 
-    // Delete a task by its ID
+    // Delete a task by ID
     async delete(id) {
-        const command = new DeleteCommand({
-            TableName: TABLE_NAME,
-            Key: { id },
-        });
-        return await docClient.send(command);
+        try {
+            const command = new DeleteCommand({
+                TableName: TABLE_NAME,
+                Key: { id },
+            });
+            const result = await docClient.send(command);
+            return result;
+        } catch (error) {
+            console.error(JSON.stringify({
+                level: "ERROR",
+                timestamp: new Date().toISOString(),
+                component: "TaskRepository",
+                operation: "delete",
+                taskId: id,
+                message: error.message
+            }));
+            throw error;
+        }
     }
 };

@@ -3,36 +3,58 @@ import { success, notFound, serverError, clientError } from "../utils/response.j
 
 /**
  * Lambda handler to retrieve detailed information for a specific task.
+ * Integrated with Structured Logging & Request Context.
  * @param {Object} event - Event object containing path parameters.
+ * @param {Object} context - The Lambda context object for runtime information.
  * @returns {Object} - Response with task details or an error message.
  */
-export const handler = async (event) => {
+export const handler = async (event, context) => {
+    // 1. Initialize logContext (Correlation ID for tracing)
+    const logContext = {
+        awsRequestId: context.awsRequestId,
+        path: event.path,
+        httpMethod: event.httpMethod
+    };
+
     try {
         // Extract the unique task identifier from path parameters
         const id = event.pathParameters?.id;
 
-        // Validation: Ensure a Task ID is provided in the request URL
+        // 2. Structured Log (DEBUG): Record the fetch attempt
+        console.debug(JSON.stringify({
+            level: "DEBUG",
+            timestamp: new Date().toISOString(),
+            requestId: logContext.awsRequestId,
+            message: "Fetching task details",
+            taskId: id
+        }));
+
+        // Validation: Ensure a Task ID is provided
         if (!id) {
-            return clientError("Task ID is required.");
+            return clientError("Task ID is required.", logContext);
         }
 
-        // Business Logic: Fetch specific task information from the service layer
+        // 3. Business Logic: Fetch specific task from the service layer
         const task = await taskService.getTaskDetails(id);
         
-        // Return a 200 OK success response with the retrieved task object
-        return success(task);
+        // 4. Success Response
+        // Automatically logs at INFO level via response.js
+        return success(task, logContext);
 
     } catch (error) {
-        // Error Handling: Catch cases where the task does not exist in the database
-        // Note: Check for both English and Vietnamese error triggers for compatibility
-        if (error.message.includes("Not found") || error.message.includes("Không tìm thấy")) {
-            return notFound(error.message);
+        /**
+         * 5. Error Handling
+         * If the service layer indicates the item doesn't exist, return 404 (WARN level)
+         * English-only check for professional consistency.
+         */
+        if (error.message.includes("Not found")) {
+            return notFound(error.message, logContext);
         }
 
-        // Log the error for internal system monitoring
-        console.error(`Error retrieving details for task ${event.pathParameters?.id}:`, error);
-
-        // Return a 500 Internal Server Error for generic failures
-        return serverError("An unexpected error occurred while fetching task details.");
+        /**
+         * 6. Unexpected System Errors
+         * serverError will log the full Stack Trace as FATAL in CloudWatch
+         */
+        return serverError(error, logContext);
     }
 };

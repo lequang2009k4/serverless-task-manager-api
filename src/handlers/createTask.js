@@ -3,43 +3,61 @@ import { created, clientError, serverError } from "../utils/response.js";
 import { validator } from "../utils/validator.js";
 
 /**
- * Lambda/Controller handler to create a new task.
- * @param {Object} event - The event object from the provider (e.g., AWS API Gateway).
- * @returns {Object} - Formatted HTTP response.
+ * Lambda handler to create a new task.
+ * Integrated with Structured Logging & Request Context.
+ * @param {Object} event - The event object from AWS API Gateway.
+ * @param {Object} context - The Lambda context object for runtime information.
  */
-export const handler = async (event) => {
+export const handler = async (event, context) => {
+    // 1. Initialize logContext (The "red thread" for log tracing)
+    const logContext = {
+        awsRequestId: context.awsRequestId,
+        path: event.path,
+        httpMethod: event.httpMethod
+    };
+
     try {
         // Check if the request body exists
         if (!event.body) {
-            return clientError("Input data cannot be empty.");
+            return clientError("Input data cannot be empty.", logContext);
         }
 
-        // Parse the incoming JSON string into an object
         let data;
         try {
             data = JSON.parse(event.body);
         } catch (parseError) {
-            return clientError("Invalid JSON format.");
+            return clientError("Invalid JSON format.", logContext);
         }
 
-        // 1. Validation: Ensure required fields (e.g., title) are present
+        // 2. Structured Log (DEBUG): Record the parsed input
+        // Principle: "No Sensitive Info" - sanitize any PII before logging if necessary
+        console.debug(JSON.stringify({
+            level: "DEBUG",
+            timestamp: new Date().toISOString(),
+            requestId: logContext.awsRequestId,
+            message: "Incoming create task request",
+            payload: data 
+        }));
+
+        // 3. Validation
         const validationResult = validator.validateCreateTask(data);
         if (!validationResult.isValid) {
-            // Return the first validation error message found
-            return clientError(validationResult.errors);
+            // This will be logged as WARN via response.js
+            return clientError(validationResult.errors, logContext);
         }
 
-        // 2. Business Logic: Call the service layer to interact with the database
+        // 4. Business Logic
         const newTask = await taskService.createNewTask(data);
 
-        // Return a 201 Created response with the result data
-        return created(newTask);
+        // Return 201 Created and automatically log at INFO level
+        return created(newTask, logContext);
 
     } catch (error) {
-        // Log the error for internal debugging
-        console.error("Error creating task:", error);
-
-        // Return a 500 Internal Server Error response
-        return serverError("An unexpected error occurred while creating the task.");
+        /**
+         * 5. System Error Handling
+         * serverError will automatically log at FATAL level with Stack Trace in CloudWatch
+         * while returning a generic message to the Client for security.
+         */
+        return serverError(error, logContext);
     }
 };
