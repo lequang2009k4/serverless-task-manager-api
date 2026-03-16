@@ -2,6 +2,14 @@ AWSTemplateFormatVersion: '2010-09-09' # CloudFormation language version (standa
 Transform: AWS::Serverless-2016-10-31  # Important: Tells AWS this is SAM, not standard CloudFormation
 Description: Task Management API 
 
+# --- PARAMETER TO TAKE VALUE OF SAMCONFIG.TOML ---
+Parameters:
+  Env:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, uat]
+    Description: Environment stage (dev or uat)
+
 Globals:
   Function:
     Runtime: nodejs20.x
@@ -10,6 +18,7 @@ Globals:
     Environment:  # Accessible in code via: const TABLE_NAME = process.env.TABLE_NAME
       Variables:
         TABLE_NAME: !Ref TasksTable  # All Lambdas can see this variable
+        NODE_ENV: !Ref Env 
     # --- LOGGING STRATEGY (Native JSON) ---
     LoggingConfig:
       LogFormat: JSON         # Automatically converts Lambda system logs into JSON
@@ -25,13 +34,14 @@ Resources:
   MyUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: MyTaskAppUsers
+      UserPoolName: !Sub "MyTaskAppUsers-${Env}"
       UsernameAttributes: [email]
       AutoVerifiedAttributes: [email]
 
   MyUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
+      ClientName: !Sub "MyTaskAppClient-${Env}"
       UserPoolId: !Ref MyUserPool
       ExplicitAuthFlows: [ADMIN_NO_SRP_AUTH, USER_PASSWORD_AUTH]
 
@@ -41,7 +51,7 @@ Resources:
   MyApi:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: Prod
+      StageName: !Ref Env
       Auth:
         DefaultAuthorizer: MyCognitoAuth
         Authorizers:
@@ -52,7 +62,7 @@ Resources:
   TasksTable:
     Type: AWS::DynamoDB::Table  # Declares a NoSQL database table
     Properties:
-      TableName: MySimpleTasks
+      TableName: !Sub "MySimpleTasks-${Env}"
       AttributeDefinitions:     # Declares columns used as keys
         - AttributeName: id
           AttributeType: S
@@ -165,8 +175,10 @@ Resources:
 Outputs:
   ApiUrl:
     Description: "Base URL for the API Gateway"
-    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/tasks"
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/${Env}/tasks"
   UserPoolId:
     Value: !Ref MyUserPool
   UserPoolClientId:
     Value: !Ref MyUserPoolClient
+  Environment:
+    Value: !Ref Env
