@@ -97,7 +97,7 @@ Resources:
                   [ "...", "${GetTaskByIdFunction}", { "label": "GetById" } ],
                   [ "...", "${DeleteTaskFunction}", { "label": "Delete" } ]
                 ],
-                "period": 300,
+                "period": 30,
                 "stat": "Sum",
                 "region": "${AWS::Region}",
                 "title": "1. Invocations"
@@ -113,7 +113,7 @@ Resources:
                   [ "...", "${GetTaskByIdFunction}", { "label": "GetById" } ],
                   [ "...", "${DeleteTaskFunction}", { "label": "Delete" } ]
                 ],
-                "period": 300,
+                "period": 30,
                 "stat": "Average",
                 "region": "${AWS::Region}",
                 "title": "2. Duration (ms)"
