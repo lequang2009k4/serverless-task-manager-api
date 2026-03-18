@@ -64,7 +64,7 @@ Resources:
     Properties:
       TableName: !Sub "MySimpleTasks-${Env}"
       AttributeDefinitions:     # Declares columns used as keys
-        - AttributeName: id
+        - AttributeName: ida
           AttributeType: S
       KeySchema:                # Defines 'id' as the HASH (Partition Key) used for data lookups
         - AttributeName: id
@@ -235,7 +235,50 @@ Resources:
             RestApiId: !Ref MyApi #Connect with API have Auth
             Path: /tasks/{id}
             Method: delete
+  ##########################################################################
+  # 6. ALARM & NOTIFICATION 
+  ##########################################################################
+  
+  # Step A: SNS Topic to notif message
+  MyMonitoringTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub "Alert-Topic-${Env}"
+      TopicName: !Sub "task-manager-alerts-${Env}"
 
+  #step B: Error Alarm
+  #Sum error of lambda >0 while 5 minute
+  TotalErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Noti if have any error lambda"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      #Not choose Dimension FunctionName for it scan ALL lambda function in Stack 
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref MyMonitoringTopic
+      TreatMissingData: notBreaching
+
+  # Bước C: Duration Alarm
+  # Noti if have lambda function run >5s
+  HighLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Noti if system response > 5s"
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5000 # 5000ms = 5s
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref MyMonitoringTopic
 Outputs:
   ApiUrl:
     Description: "Base URL for the API Gateway"
